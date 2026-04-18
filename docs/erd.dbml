@@ -1,0 +1,149 @@
+// --- ENUMS---
+
+Enum user_role {
+  VISITOR
+  REGISTRED_USER
+  AUTHOR
+  EDITOR
+  NEWSPAPER_MANAGER
+  DIRECTOR
+  SYSTEM_ADMINISTRATOR
+}
+
+Enum article_state {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED_BY_EDITOR
+  APPROVED_BY_MANAGER
+  PUBLISHED
+  REJECTED
+}
+
+Enum review_decisions {
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+Enum result {
+  SUCCESS
+  FAILURE
+}
+
+// --- TABLES ---
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  newspaper_id uuid [ref: > newspapers.id]
+  email varchar(255) [not null]
+  username varchar(63) [not null]
+  fullname varchar(127)
+  password_hash text [not null]
+  email_verified boolean [default: false]
+
+  indexes {
+    (email, newspaper_id) [unique, name: "email_newspaper_idx"]
+  }
+}
+
+Table newspapers {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(255) [not null]
+  slug varchar(255) [not null, unique]
+
+  indexes {
+    slug [unique, name: "newspaper_slug_idx"]
+  }
+}
+
+Table user_roles {
+  user_id uuid [ref: > users.id]
+  newspaper_id uuid [ref: > newspapers.id]
+  role user_role [default: 'VISITOR']
+
+  indexes {
+    (user_id, newspaper_id, role) [pk]
+  }
+}
+
+Table newspaper_authors {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null, ref: > users.id]
+  newspapers_id uuid [not null, ref: > newspapers.id]
+  biography text
+  profile_picture_url text //
+
+  indexes {
+    (user_id, newspapers_id) [unique]
+  }
+}
+
+Table articles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  title varchar(255) [not null]
+  perex text [not null]
+  content text [not null]
+  keywords text
+  state article_state [default: 'DRAFT']
+  author_id uuid [not null, ref: > users.id]
+  newspaper_id uuid [not null, ref: > newspapers.id]
+  category_id uuid [ref: > article_categories.id]
+  publication_date timestamp
+  created_at timestamp [default: `now()`]
+}
+
+Table article_category {
+  id uuid [pk]
+  category_name varchar [unique, not null]
+  slug [unique, not null]
+
+  indexes {
+    slug [unique, name: "article_slug_idx"]
+  }
+}
+
+Table article_images {
+  id uuid [pk]
+  article_id uuid [ref: > articles.id]
+  url text [not null]
+  caption text
+  is_primary boolean
+}
+
+Table comments {
+  id uuid [pk]
+  article_id uuid [ref: > articles.id]
+  user_id uuid [ref: > users.id]
+  content text [not null]
+  created_at timestamp [default: `now()`]
+}
+
+Table likes {
+  user_id uuid [not null, ref: > users.id]
+  article_id uuid [not null, ref: > articles.id]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    (user_id, article_id) [pk]
+  }
+}
+
+Table article_reviews {
+  id uuid [pk, default: `gen_random_uuid()`]
+  article_id uuid [not null, ref: > articles.id]
+  reviewer_id uuid [not null, ref: > users.id]
+  feedback text
+  decision review_decisions [not null]
+  created_at timestamp [not null, default: `now()`]
+}
+
+Table audit_logs {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [ref: > users.id]
+  operation_type varchar(255) [not null]
+  target_object_id uuid
+  result audit_result [not null]
+  timestamp timestamp [not null, default: `now()`]
+}
+

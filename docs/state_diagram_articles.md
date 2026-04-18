@@ -1,0 +1,20 @@
+```plantuml
+@startuml
+
+[*] --> Draft : author writes article
+Draft --> Submitted : article submitted for review
+Submitted --> InReview : editor assigns article to editor
+InReview --> ApprovedByEditor : editor approves article
+InReview --> Rejected : editor rejects article
+InReview --> Draft : editor requests revisions
+ApprovedByEditor --> ApprovedByManager : manager approves article
+ApprovedByEditor --> Rejected : manager rejects article
+ApprovedByEditor --> Draft : manager requests revisions
+ApprovedByManager --> ApprovedByDirector : director approves article
+ApprovedByManager --> Rejected : director rejects article
+ApprovedByManager --> Draft : director requests revisions
+ApprovedByDirector --> Published : publication time
+Published --> [*]
+
+@enduml
+```

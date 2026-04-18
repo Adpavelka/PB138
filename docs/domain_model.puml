@@ -1,0 +1,149 @@
+@startuml
+
+' =====================
+' Users and Roles
+' =====================
+
+class CommonUser <<entity>> {
+  uuid
+  username
+  email
+  passwordHash
+}
+
+class ContentAdministrator <<entity>> {
+  biography
+  profilePicture
+}
+
+enum Role {
+  VISITOR
+  REGISTERED_USER
+  AUTHOR
+  EDITOR
+  NEWSPAPER_MANAGER
+  DIRECTOR
+  SYSTEM_ADMINISTRATOR
+}
+
+CommonUser --> "1..*" Role
+CommonUser <|-- ContentAdministrator
+
+
+' =====================
+' Publishing Structure
+' =====================
+
+class PublishingHouse <<entity>> {
+  uuid
+  name
+}
+
+class Newspaper <<entity>> {
+  uuid
+  name
+}
+
+PublishingHouse *-- "*" Newspaper
+ContentAdministrator "1" -- "1..*" Newspaper : manages (Manager)
+ContentAdministrator "1" -- "1..*" PublishingHouse : oversees (Director)
+
+
+' =====================
+' Article System
+' =====================
+
+class Article <<entity>> {
+  title
+  perex
+  content
+  keywords
+  publicationTimestamp
+}
+
+enum ArticleState {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED_BY_EDITOR
+  APPROVED_BY_MANAGER
+  APPROVED_BY_DIRECTOR
+  PUBLISHED
+  REJECTED
+}
+
+Article "*" --> "1" ArticleState
+
+ContentAdministrator "1" -- "*" Article : writes
+Newspaper o-- "*" Article : publishes
+
+' =====================
+' Categories
+' =====================
+
+class Category <<entity>> {
+  uuid
+  name
+}
+
+Article "*" -- "1" Category
+
+
+' =====================
+' Article Images
+' =====================
+
+class Image <<entity>> {
+  url
+  caption
+}
+
+Article *-- "1..*" Image
+
+
+' =====================
+' Comments
+' =====================
+
+class Comment <<entity>> {
+  content
+  createTimestamp
+}
+
+CommonUser "1" -- "*" Comment : writes
+Article "1" -- "*" Comment
+
+
+' =====================
+' Likes
+' =====================
+
+class Like <<entity>> {
+    createTimestamp
+}
+
+CommonUser "1" -- "*" Like
+Article "1" -- "*" Like
+
+
+' =====================
+' Article Review Workflow
+' =====================
+
+class ArticleReview <<entity>> {
+  feedback
+  reviewTimmestamp
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+Article "1" -- "*" ArticleReview
+ContentAdministrator "1" <-- "*" ArticleReview : reviewer
+ArticleReview "*" --> "1" ReviewDecision
+
+
+@enduml
