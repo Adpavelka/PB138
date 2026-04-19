@@ -158,3 +158,70 @@ export const auditLogs = pgTable("audit_logs", {
     result: auditResultEnum("result").notNull(),
     timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+    newspaper: one(newspapers, { fields: [users.newspaperId], references: [newspapers.id] }),
+    roles: many(userRoles),
+    articles: many(articles),
+    comments: many(comments),
+    likes: many(likes),
+    reviews: many(articleReviews, { relationName: "reviewer" }),
+    authorProfile: many(newspaperAuthors),
+}));
+
+export const newspapersRelations = relations(newspapers, ({ many }) => ({
+    users: many(users),
+    articles: many(articles),
+    authors: many(newspaperAuthors),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+    user: one(users, { fields: [userRoles.userId], references: [users.id] }),
+    newspaper: one(newspapers, { fields: [userRoles.newspaperId], references: [newspapers.id] }),
+}));
+
+export const newspaperAuthorsRelations = relations(newspaperAuthors, ({ one }) => ({
+    user: one(users, { fields: [newspaperAuthors.userId], references: [users.id] }),
+    newspaper: one(newspapers, { fields: [newspaperAuthors.newspaperId], references: [newspapers.id] }),
+}));
+
+export const articlesRelations = relations(articles, ({ one, many }) => ({
+    author: one(users, { fields: [articles.authorId], references: [users.id] }),
+    newspaper: one(newspapers, { fields: [articles.newspaperId], references: [newspapers.id] }),
+    category: one(articleCategory, { fields: [articles.categoryId], references: [articleCategory.id] }),
+    images: many(articleImages),
+    comments: many(comments),
+    likes: many(likes),
+    reviews: many(articleReviews),
+}));
+
+export const articleCategoryRelations = relations(articleCategory, ({ many }) => ({
+    articles: many(articles),
+}));
+
+export const articleImagesRelations = relations(articleImages, ({ one }) => ({
+    article: one(articles, { fields: [articleImages.articleId], references: [articles.id] }),
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+    article: one(articles, { fields: [comments.articleId], references: [articles.id] }),
+    user: one(users, { fields: [comments.userId], references: [users.id] }),
+}));
+
+export const likesRelations = relations(likes, ({ one }) => ({
+    article: one(articles, { fields: [likes.articleId], references: [articles.id] }),
+    user: one(users, { fields: [likes.userId], references: [users.id] }),
+}));
+
+export const articleReviewsRelations = relations(articleReviews, ({ one }) => ({
+    article: one(articles, { fields: [articleReviews.articleId], references: [articles.id] }),
+    reviewer: one(users, {
+        fields: [articleReviews.reviewerId],
+        references: [users.id],
+        relationName: "reviewer",
+    }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+    user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+}));
