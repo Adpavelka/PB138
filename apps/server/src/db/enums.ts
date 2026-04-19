@@ -16,6 +16,7 @@ export const articleStateEnum = pgEnum("article_state", [
     "IN_REVIEW",
     "APPROVED_BY_EDITOR",
     "APPROVED_BY_MANAGER",
+    "APPROVED_BY_DIRECTOR",
     "PUBLISHED",
     "REJECTED"
 ]);

@@ -13,7 +13,7 @@ import {
     newspaperAuthors,
     userRoles,
 } from "../db/schema";
-import { eq, and, ilike, or, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,22 +60,25 @@ export const articleRoutes = new Elysia()
                     eq(articles.newspaperId, params.newspaper_id),
                     eq(articles.state, "PUBLISHED")
                 ),
-                with: { category: true, images: true },
+                with: { category: true, images: true, author: true },
             });
 
             const lower = q.toLowerCase();
             let filtered = all.filter((a: any) => {
-                const inTitle = a.title?.toLowerCase().includes(lower);
-                const inPerex = a.perex?.toLowerCase().includes(lower);
-                const inContent = a.content?.toLowerCase().includes(lower);
-                const inKeywords = a.keywords?.toLowerCase().includes(lower);
-                const inCategory = a.category?.categoryName?.toLowerCase().includes(lower);
-                return inTitle || inPerex || inContent || inKeywords || inCategory;
+                return (
+                    a.author?.fullname?.toLowerCase().includes(lower) ||
+                    a.title?.toLowerCase().includes(lower) ||
+                    a.perex?.toLowerCase().includes(lower) ||
+                    a.content?.toLowerCase().includes(lower) ||
+                    a.keywords?.toLowerCase().includes(lower) ||
+                    a.category?.categoryName?.toLowerCase().includes(lower)
+                );
             });
 
             if (query?.category) {
                 filtered = filtered.filter(
-                    (a: any) => a.category?.categoryName?.toLowerCase() === query.category.toLowerCase()
+                    (a: any) =>
+                        a.category?.categoryName?.toLowerCase() === query.category.toLowerCase()
                 );
             }
             if (query?.date_from) {
@@ -96,6 +99,7 @@ export const articleRoutes = new Elysia()
                 data: paged.map((a: any) => {
                     const primary = a.images?.find((i: any) => i.isPrimary) ?? a.images?.[0];
                     return {
+                        author: a.author ? { id: a.author.id, full_name: a.author.fullname } : null,
                         id: a.id,
                         title: a.title,
                         perex: a.perex,
@@ -125,13 +129,11 @@ export const articleRoutes = new Elysia()
             const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
             const offset = (page - 1) * limit;
 
-            const where: any = and(
-                eq(articles.authorId, user.id),
-                eq(articles.newspaperId, params.newspaper_id)
-            );
-
             const all = await db.query.articles.findMany({
-                where,
+                where: and(
+                    eq(articles.authorId, user.id),
+                    eq(articles.newspaperId, params.newspaper_id)
+                ),
                 with: { category: true },
                 orderBy: [desc(articles.createdAt)],
             });
@@ -140,7 +142,6 @@ export const articleRoutes = new Elysia()
                 ? all.filter((a: any) => a.state === query.status)
                 : all;
 
-            // fetch latest review/feedback per article
             const total = filtered.length;
             const paged = filtered.slice(offset, offset + limit);
 
@@ -207,8 +208,8 @@ export const articleRoutes = new Elysia()
 
             let filtered = all.filter((a: any) => allowedStates.includes(a.state));
 
-            // Editors only see articles assigned to them
             if (isEditor && !isManager && !isDirector) {
+                // Editors only see articles whose most recent review was assigned to them
                 const assignedReviews = await db.query.articleReviews.findMany({
                     where: eq(articleReviews.reviewerId, user.id),
                 });
@@ -277,7 +278,6 @@ export const articleRoutes = new Elysia()
                               ),
                           })
                         : null;
-                    const primary = a.images?.find((i: any) => i.isPrimary) ?? a.images?.[0];
                     return {
                         ...articleSummary(a),
                         author: author
@@ -301,7 +301,7 @@ export const articleRoutes = new Elysia()
     // ── GET /api/newspapers/:newspaper_id/articles/:article_id ────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/:article_id",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user }: any) => {
             if (!user) return unauthorized();
             if (user.newspaperId !== params.newspaper_id) return forbidden();
 
@@ -330,11 +330,9 @@ export const articleRoutes = new Elysia()
                 .from(likes)
                 .where(eq(likes.articleId, article.id));
 
-            const likedByMe = user
-                ? !!(await db.query.likes.findFirst({
-                      where: and(eq(likes.userId, user.id), eq(likes.articleId, article.id)),
-                  }))
-                : false;
+            const likedByMe = !!(await db.query.likes.findFirst({
+                where: and(eq(likes.userId, user.id), eq(likes.articleId, article.id)),
+            }));
 
             const articleComments = await db.query.comments.findMany({
                 where: eq(comments.articleId, article.id),
@@ -390,17 +388,30 @@ export const articleRoutes = new Elysia()
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
 
             const { title, perex, content, category_id, keywords } = body ?? {};
-            if (!title?.trim() || !perex?.trim() || !content?.trim())
+            if (!title?.trim()) {
                 return Response.json(
                     { error: "VALIDATION_ERROR", fields: { title: "Title is required" } },
                     { status: 422 }
                 );
+            }
+            if (!perex?.trim()) {
+                return Response.json(
+                    { error: "VALIDATION_ERROR", fields: { perex: "Perex is required" } },
+                    { status: 422 }
+                );
+            }
+            if (!content?.trim()) {
+                return Response.json(
+                    { error: "VALIDATION_ERROR", fields: { content: "Content is required" } },
+                    { status: 422 }
+                );
+            }
 
             if (category_id) {
                 const cat = await db.query.articleCategory.findFirst({
                     where: eq(articleCategory.id, category_id),
                 });
-                if (!cat) return notFound("NEWSPAPER_NOT_FOUND");
+                if (!cat) return notFound("CATEGORY_NOT_FOUND");
             }
 
             const [article] = await db
@@ -418,7 +429,9 @@ export const articleRoutes = new Elysia()
                 .returning();
 
             const cat = category_id
-                ? await db.query.articleCategory.findFirst({ where: eq(articleCategory.id, category_id) })
+                ? await db.query.articleCategory.findFirst({
+                      where: eq(articleCategory.id, category_id),
+                  })
                 : null;
 
             return Response.json(
@@ -453,9 +466,20 @@ export const articleRoutes = new Elysia()
                 ),
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
-            if (article.authorId !== user.id || article.state !== "DRAFT") return forbidden();
+
+            if (article.authorId !== user.id) return forbidden();
+            if (article.state !== "DRAFT") return forbidden();
 
             const { title, perex, content, category_id, keywords } = body ?? {};
+
+            // Validate non-empty strings if provided
+            if (title !== undefined && !title.trim()) {
+                return Response.json(
+                    { error: "VALIDATION_ERROR", fields: { title: "Title cannot be empty" } },
+                    { status: 422 }
+                );
+            }
+
             const updateData: Record<string, any> = {};
             if (title !== undefined) updateData.title = title;
             if (perex !== undefined) updateData.perex = perex;
@@ -525,14 +549,15 @@ export const articleRoutes = new Elysia()
                 ),
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
-            if (article.authorId !== user.id || article.state !== "DRAFT") return forbidden();
+            if (article.authorId !== user.id) return forbidden();
+            if (article.state !== "DRAFT") return forbidden();
 
-            // Require at least one image
             const images = await db.query.articleImages.findMany({
                 where: eq(articleImages.articleId, article.id),
             });
-            if (images.length === 0)
+            if (images.length === 0) {
                 return Response.json({ error: "ARTICLE_MISSING_IMAGE" }, { status: 422 });
+            }
 
             await db
                 .update(articles)
@@ -642,12 +667,12 @@ export const articleRoutes = new Elysia()
             const allImages = await db.query.articleImages.findMany({
                 where: eq(articleImages.articleId, article.id),
             });
-            if (allImages.length === 1)
+            if (allImages.length === 1) {
                 return Response.json({ error: "ARTICLE_MUST_HAVE_ONE_IMAGE" }, { status: 422 });
+            }
 
             await db.delete(articleImages).where(eq(articleImages.id, params.image_id));
 
-            // If we deleted the primary, promote the next one
             if (image.isPrimary) {
                 const remaining = allImages.filter((i: any) => i.id !== params.image_id);
                 if (remaining[0]) {
@@ -676,14 +701,18 @@ export const articleRoutes = new Elysia()
                 ),
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
-            if (article.state !== "SUBMITTED")
+            if (article.state !== "SUBMITTED") {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
             const { editor_id } = body ?? {};
-            if (!editor_id)
-                return Response.json({ error: "VALIDATION_ERROR", fields: { editor_id: "Required" } }, { status: 422 });
+            if (!editor_id) {
+                return Response.json(
+                    { error: "VALIDATION_ERROR", fields: { editor_id: "Required" } },
+                    { status: 422 }
+                );
+            }
 
-            // Verify the target user is an EDITOR in this newspaper
             const editorRole = await db.query.userRoles.findFirst({
                 where: and(
                     eq(userRoles.userId, editor_id),
@@ -691,21 +720,16 @@ export const articleRoutes = new Elysia()
                     eq(userRoles.role, "EDITOR")
                 ),
             });
-            if (!editorRole)
+            if (!editorRole) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
+            // FIX: only update the article state – do NOT insert a fake review record here.
+            // The actual review record is created when the editor calls POST /review.
             await db
                 .update(articles)
                 .set({ state: "IN_REVIEW" })
                 .where(eq(articles.id, article.id));
-
-            // Record the assignment as a review entry
-            await db.insert(articleReviews).values({
-                articleId: article.id,
-                reviewerId: editor_id,
-                decision: "APPROVED", // placeholder; actual decision comes from /review
-                feedback: null,
-            });
 
             const editor = await db.query.users.findFirst({ where: eq(users.id, editor_id) });
 
@@ -731,27 +755,35 @@ export const articleRoutes = new Elysia()
                 ),
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
-            if (article.state !== "IN_REVIEW")
+            if (article.state !== "IN_REVIEW") {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
             const { decision, note } = body ?? {};
-            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision))
+            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision)) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note)
+            }
+            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note?.trim()) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
-            const stateMap: Record<string, any> = {
+            const stateMap: Record<string, string> = {
                 APPROVE: "APPROVED_BY_EDITOR",
                 REJECT: "REJECTED",
                 REQUEST_REVISION: "DRAFT",
             };
-            const newState = stateMap[decision];
+            const newState = stateMap[decision]!;
 
-            await db.update(articles).set({ state: newState }).where(eq(articles.id, article.id));
+            await db.update(articles).set({ state: newState as any }).where(eq(articles.id, article.id));
             await db.insert(articleReviews).values({
                 articleId: article.id,
                 reviewerId: user.id,
-                decision: decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "REVISION_REQUESTED",
+                decision:
+                    decision === "APPROVE"
+                        ? "APPROVED"
+                        : decision === "REJECT"
+                          ? "REJECTED"
+                          : "REVISION_REQUESTED",
                 feedback: note ?? null,
             });
 
@@ -778,39 +810,52 @@ export const articleRoutes = new Elysia()
             if (!article) return notFound("ARTICLE_NOT_FOUND");
 
             const { decision, note } = body ?? {};
-            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision))
+            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision)) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note)
+            }
+            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note?.trim()) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
             let expectedState: string;
             let nextState: string;
 
-            if (isManager && !isDirector) {
-                expectedState = "APPROVED_BY_EDITOR";
-                nextState = decision === "APPROVE" ? "APPROVED_BY_MANAGER" : decision === "REJECT" ? "REJECTED" : "DRAFT";
-            } else {
-                // Director
+            if (isDirector) {
                 expectedState = "APPROVED_BY_MANAGER";
-                // Note: APPROVED_BY_DIRECTOR doesn't exist in enum; director approval goes to APPROVED_BY_MANAGER
-                // and schedule/publish is handled separately. We keep article at APPROVED_BY_MANAGER
-                // and set a special flag. Since we can't add enum values without migration, we mark it ready.
-                nextState = decision === "APPROVE" ? "APPROVED_BY_MANAGER" : decision === "REJECT" ? "REJECTED" : "DRAFT";
-                // Practically: when director approves from APPROVED_BY_MANAGER we publish it (or keep same state)
-                // We'll set publicationDate to now to indicate it's ready if no schedule is set
-                if (decision === "APPROVE") {
-                    nextState = "PUBLISHED"; // Director final approval = published
-                }
+                nextState =
+                    decision === "APPROVE"
+                        ? "APPROVED_BY_DIRECTOR"
+                        : decision === "REJECT"
+                          ? "REJECTED"
+                          : "DRAFT";
+            } else {
+                expectedState = "APPROVED_BY_EDITOR";
+                nextState =
+                    decision === "APPROVE"
+                        ? "APPROVED_BY_MANAGER"
+                        : decision === "REJECT"
+                          ? "REJECTED"
+                          : "DRAFT";
             }
 
-            if (article.state !== expectedState)
+            if (article.state !== expectedState) {
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+            }
 
-            await db.update(articles).set({ state: nextState as any }).where(eq(articles.id, article.id));
+            await db
+                .update(articles)
+                .set({ state: nextState as any })
+                .where(eq(articles.id, article.id));
+
             await db.insert(articleReviews).values({
                 articleId: article.id,
                 reviewerId: user.id,
-                decision: decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "REVISION_REQUESTED",
+                decision:
+                    decision === "APPROVE"
+                        ? "APPROVED"
+                        : decision === "REJECT"
+                          ? "REJECTED"
+                          : "REVISION_REQUESTED",
                 feedback: note ?? null,
             });
 
@@ -833,17 +878,19 @@ export const articleRoutes = new Elysia()
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
 
-            // Accept scheduling when article is approved by manager (ready for publication)
-            if (article.state !== "APPROVED_BY_MANAGER")
+            if (article.state !== "APPROVED_BY_DIRECTOR") {
                 return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
+            }
 
             const { publication_date } = body ?? {};
-            if (!publication_date)
+            if (!publication_date) {
                 return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
+            }
 
             const pubDate = new Date(publication_date);
-            if (isNaN(pubDate.getTime()) || pubDate <= new Date())
+            if (isNaN(pubDate.getTime()) || pubDate <= new Date()) {
                 return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
+            }
 
             await db
                 .update(articles)
