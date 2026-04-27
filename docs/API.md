@@ -634,6 +634,7 @@ Authorization: Bearer <token>
     "content": "Plný text článku...",
     "publication_date": "2026-04-10T08:00:00Z",
     "category": "Technology",
+    "category_slug": "technology",
     "keywords": ["bun", "typescript"],
     "likes_count": 42,
     "liked_by_me": true,
@@ -1454,8 +1455,8 @@ Return all categories defined for a newspaper.
 ```json
 {
     "data": [
-        { "id": "cat123...", "name": "Technology" },
-        { "id": "cat456...", "name": "Sport" }
+        { "id": "cat123...", "name": "Technology", "slug": "technology" },
+        { "id": "cat456...", "name": "Sport", "slug": "sport" }
     ]
 }
 ```
@@ -1463,6 +1464,36 @@ Return all categories defined for a newspaper.
 `404 Not Found` — newspaper does not exist
 ```json
 { "error": "NEWSPAPER_NOT_FOUND" }
+```
+
+---
+
+### GET /api/newspapers/:newspaper_id/categories/by-slug/:slug
+
+Return a single category by its URL slug.
+
+**Auth required:** No
+
+**URL parameters:**
+
+| Parameter    | Description           |
+|--------------|-----------------------|
+| newspaper_id | UUID of the newspaper |
+| slug         | URL slug of the category |
+
+**Responses:**
+
+`200 OK`
+```json
+{ "id": "cat123...", "name": "Technology", "slug": "technology" }
+```
+
+`404 Not Found` — newspaper or category does not exist
+```json
+{ "error": "NEWSPAPER_NOT_FOUND" }
+```
+```json
+{ "error": "CATEGORY_NOT_FOUND" }
 ```
 
 ---

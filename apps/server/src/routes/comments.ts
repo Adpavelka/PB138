@@ -3,6 +3,13 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { comments, articles, newspapers, users } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+	commentCreateParams,
+	commentDeleteParams,
+	commentModerationParams,
+	commentBody,
+	commentModerationQuery,
+} from "@pb138/shared";
 
 export const commentRoutes = new Elysia()
     .use(authMiddleware)
@@ -10,7 +17,7 @@ export const commentRoutes = new Elysia()
     // POST /api/newspapers/:newspaper_id/articles/:article_id/comments — REGISTERED_USER
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/comments",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
             const article = await db.query.articles.findFirst({
@@ -25,17 +32,7 @@ export const commentRoutes = new Elysia()
             if (user.newspaperId !== params.newspaper_id)
                 return Response.json({ error: "FORBIDDEN" }, { status: 403 });
 
-            const { content } = body ?? {};
-            if (!content?.trim())
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { content: "Comment cannot be empty" } },
-                    { status: 422 }
-                );
-            if (content.length > 2000)
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { content: "Comment cannot exceed 2000 characters" } },
-                    { status: 422 }
-                );
+            const { content } = body;
 
             const [comment] = await db
                 .insert(comments)
@@ -51,13 +48,15 @@ export const commentRoutes = new Elysia()
                 },
                 { status: 201 }
             );
-        }
-    )
+        }, {
+			params: commentCreateParams,
+			body: commentBody,
+		})
 
     // DELETE /api/newspapers/:newspaper_id/articles/:article_id/comments/:comment_id
     .delete(
         "/api/newspapers/:newspaper_id/articles/:article_id/comments/:comment_id",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
             const comment = await db.query.comments.findFirst({
@@ -75,11 +74,12 @@ export const commentRoutes = new Elysia()
 
             await db.delete(comments).where(eq(comments.id, params.comment_id));
             return new Response(null, { status: 204 });
-        }
-    )
+        }, {
+			params: commentDeleteParams,
+		})
 
     // GET /api/newspapers/:newspaper_id/comments — moderation (EDITOR, MANAGER, SYSTEM_ADMIN)
-    .get("/api/newspapers/:newspaper_id/comments", async ({ params, user, roles, query }: any) => {
+    .get("/api/newspapers/:newspaper_id/comments", async ({ params, user, roles, query }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
         const hasAccess =
@@ -93,9 +93,8 @@ export const commentRoutes = new Elysia()
         });
         if (!newspaper) return Response.json({ error: "NEWSPAPER_NOT_FOUND" }, { status: 404 });
 
-        const page = parseInt(query?.page ?? "1");
-        const limit = Math.min(parseInt(query?.limit ?? "50"), 100);
-        const offset = (page - 1) * limit;
+		const { page, limit, article_id } = query;
+		const offset = (page - 1) * limit;
 
         // Get all comments across articles in this newspaper
         const allComments = await db.query.comments.findMany({
@@ -108,7 +107,7 @@ export const commentRoutes = new Elysia()
         // Filter by newspaper (via article.newspaperId) and optionally by article_id
         const filtered = allComments.filter((c: any) => {
             const isInNewspaper = c.article?.newspaperId === params.newspaper_id;
-            const matchesArticle = query?.article_id ? c.articleId === query.article_id : true;
+			const matchesArticle = article_id ? c.articleId === article_id : true;
             return isInNewspaper && matchesArticle;
         });
 
@@ -130,4 +129,7 @@ export const commentRoutes = new Elysia()
                 total_pages: Math.ceil(total / limit),
             },
         });
-    });
+    }, {
+		params: commentModerationParams,
+		query: commentModerationQuery,
+	});

@@ -1,19 +1,19 @@
-FROM oven/bun:1
-
+FROM oven/bun:1 AS runner
 WORKDIR /app
 
-# Copy manifests first
 COPY package.json bun.lock ./
 COPY apps/server/package.json ./apps/server/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
 
-# Install dependencies (workspace-aware)
 RUN bun install --frozen-lockfile
 
-# Copy full source
-COPY . .
+COPY apps/server/ ./apps/server/
+COPY packages/shared/ ./packages/shared/
+
+WORKDIR /app/apps/server
+RUN bun install
 
 EXPOSE 3000
 
-CMD ["bun", "run", "apps/server/src/server.ts"]
+CMD ["bun", "run", "src/server.ts"]

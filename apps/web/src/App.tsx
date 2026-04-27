@@ -1,38 +1,50 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { APITester } from "./APITester";
+import { Routes, Route } from "react-router-dom";
+import { NewspaperHomepage } from "./pages/NewspaperHomepage";
+import { ArticlePage } from "./pages/ArticlePage";
+import { CategoryPage } from "./pages/CategoryPage";
+import { AuthorPage } from "./pages/AuthorPage";
+import { SignUpPage } from "./pages/SignUpPage";
+import { LoginPage } from "./pages/LoginPage";
+import { SearchResultsPage } from "./pages/SearchResultsPage";
+import { PasswordResetPage } from "./pages/PasswordResetPage";
+import { UserProfilePage } from "./pages/UserProfilePage";
+import { AuthorDashboardPage } from "./pages/AuthorDashboardPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import "./index.css";
-
-import logo from "./logo.svg";
-import reactLogo from "./react.svg";
 
 export function App() {
   return (
-    <div className="container mx-auto p-8 text-center relative z-10">
-      <div className="flex justify-center items-center gap-8 mb-8">
-        <img
-          src={logo}
-          alt="Bun Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa] scale-120"
-        />
-        <img
-          src={reactLogo}
-          alt="React Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] [animation:spin_20s_linear_infinite]"
-        />
-      </div>
-      <Card>
-        <CardHeader className="gap-4">
-          <CardTitle className="text-3xl font-bold">Bun + React</CardTitle>
-          <CardDescription>
-            Edit <code className="rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono">src/App.tsx</code> and save to
-            test HMR
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <APITester />
-        </CardContent>
-      </Card>
-    </div>
+    <Routes>
+      <Route path="/:newspaperName" element={<NewspaperHomepage />} />
+      <Route
+        path="/:newspaperName/articles/:articleId"
+        element={<ArticlePage />}
+      />
+      <Route
+        path="/:newspaperName/category/:categoryName"
+        element={<CategoryPage />}
+      />
+      <Route
+        path="/:newspaperName/authors/:authorId"
+        element={<AuthorPage />}
+      />
+      <Route path="/:newspaperName/register" element={<SignUpPage />} />
+      <Route path="/:newspaperName/login" element={<LoginPage />} />
+      <Route path="/:newspaperName/search" element={<SearchResultsPage />} />
+      <Route
+        path="/:newspaperName/forgot-password"
+        element={<PasswordResetPage />}
+      />
+      <Route
+        path="/:newspaperName/verify-email"
+        element={<VerifyEmailPage />}
+      />
+      <Route path="/:newspaperName/profile" element={<UserProfilePage />} />
+      <Route
+        path="/:newspaperName/author-dashboard"
+        element={<AuthorDashboardPage />}
+      />
+    </Routes>
   );
 }
 

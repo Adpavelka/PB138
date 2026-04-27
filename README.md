@@ -6,11 +6,14 @@ TODO: Add description
 
 - **Runtime:** Bun
 - **Monorepo:** Turborepo
-- **Frontend:** React, TailWindCSS, Shadcn/ui
-- **Backend:** TypeScript
-- **API:** Elysia
-- **Database**: Drizzle, PostgreSQL
-- **Validation:**
+- **Frontend:** React, React Router, TailWindCSS, Shadcn/ui
+- **API:** Elysia, Swagger
+- **Auth:** JWT (@elysiajs/jwt), Bun.password (argon2)
+- **Validation:** Zod
+- **Database:** Drizzle, PostgreSQL
+- **Cache:** Redis
+- **Email:** Nodemailer
+- **Linting / Formatting:** ESLint, Prettier
 - **Language:** TypeScript
 
 ## Docker
@@ -20,13 +23,21 @@ If you use WSL, you need have Docker Desktop installed on your Windows machine.
 After installing and opening Docker Desktop and run `docker compose up -d` in the project root. Use `--build` after you change `package.json` or `bun version`. You should see the running containers on your Docker Desktop. To access the web type http://localhost:5173/ into your browser.
 Do not forget to run `docker compose down` after you are finished with your work.
 
-To start drizzle studio run:
-```bash
-cd apps/server
-bun run dev & bun db:studio
-```
-Access the database at https://local.drizzle.studio
+## Development
 
+You do not need to use docker for development. The only component it is needed for is the database. To start the database in docker run:
+
+```bash
+docker compose up db --build -d
+```
+
+This starts the database. To fill it with the seed data, follow the instruction provided in section *Database with data seed*. You can skip the step that starts docker (because you have already done it just for the database and the other components are not needed now).
+
+When developing new features on frontend and backend, you can start the components separately using `bun run dev` in their folder (`apps/web` and `apps/server`). The changes you make with automatically apply (you may need to refresh the page in your browser).
+
+## Eslint and prettier for formatting
+
+Before commiting your work, run `bun run lint` in `app/web`. This checks for your style. It may show some errors which you should fix before commiting the changes. You should also run `bun run format`. This automatically checks and fixes the formatting.
 
 ## Database with data seed
 Always run
@@ -72,6 +83,12 @@ docker compose down -v
 
 Creates and deletes the database.
 
+To start drizzle studio run:
+```bash
+cd apps/server
+bun run dev & bun db:studio
+```
+Access the database at https://local.drizzle.studio
 
 ## Prerequisites
 

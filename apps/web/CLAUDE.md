@@ -1,4 +1,3 @@
-
 Default to using Bun instead of Node.js.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
@@ -104,3 +103,19 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## API calls
+
+When communicating with backend, use API calls defined in ../../docs/API.md. Always follow their definition.
+
+## Design of the frontend pages
+
+The file ../../docs/design/design.pen was created using the Pencil app. It contains information for visualizing the frontend pages. When generating new pages, follow the design defined in this file.
+
+## Components
+
+The components for the frontend pages are defind in src/components. Try to reuse them when needed to avoid code duplication.
+
+## Others
+
+The folder src/hooks contains helpers to derive the newspaper and category information from the URL. Use them if you need to obtain newspaperId or categoryId.

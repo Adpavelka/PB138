@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { likes, articles } from "../db/schema";
 import { eq, and, count } from "drizzle-orm";
+import { likeRouteParams } from "@pb138/shared";
 
 export const likeRoutes = new Elysia()
     .use(authMiddleware)
@@ -10,7 +11,7 @@ export const likeRoutes = new Elysia()
     // POST /api/newspapers/:newspaper_id/articles/:article_id/likes
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/likes",
-        async ({ params, user }: any) => {
+        async ({ params, user }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
             if (user.newspaperId !== params.newspaper_id)
@@ -38,13 +39,14 @@ export const likeRoutes = new Elysia()
                 .where(eq(likes.articleId, params.article_id));
 
             return Response.json({ likes_count: Number(result!.count) }, { status: 201 });
-        }
-    )
+        }, {
+			params: likeRouteParams,
+		})
 
     // DELETE /api/newspapers/:newspaper_id/articles/:article_id/likes
     .delete(
         "/api/newspapers/:newspaper_id/articles/:article_id/likes",
-        async ({ params, user }: any) => {
+        async ({ params, user }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
             const article = await db.query.articles.findFirst({
@@ -70,5 +72,6 @@ export const likeRoutes = new Elysia()
                 .where(eq(likes.articleId, params.article_id));
 
             return Response.json({ likes_count: Number(result!.count) });
-        }
-    );
+        }, {
+			params: likeRouteParams,
+		});

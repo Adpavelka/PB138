@@ -1,0 +1,6 @@
+unique article category newspaper_id, name
+Ze v seedu jsou visitors jako users
+ale visitor je spis takova fejk role jak pojmenovat nekoho, kdo se bude koukat na stranky, ale neni prihlaseny ani jako registered user
+takze u visitora ani nemame ulozeny zadny data
+tady to s tim visitorem si zvladnu fixnout kdyztak, ale ty kategorie pls predelej ty
+a pak taky prosim do erd

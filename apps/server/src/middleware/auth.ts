@@ -1,20 +1,19 @@
 import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
+import { bearer } from "@elysiajs/bearer";
 import { db } from "../db";
 import { users, userRoles } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 
-export const authMiddleware = new Elysia({ name: "auth "})
+export const authMiddleware = new Elysia({ name: "auth"})
+	.use(bearer())
 	.use(jwt({ secret: process.env.JWT_SECRET! }))
-	.derive(async ({ headers, jwt }) => {
-		const auth = headers.authorization;
-
-		if (!auth || !auth.startsWith("Bearer ")) {
+	.derive({ as: "global" }, async ({ bearer, jwt }) => {
+		if (!bearer) {
 			return { user: null, roles: [] as string[] };
 		}
 
-		const token = auth.slice(7);
-		const payload = await jwt.verify(token);
+		const payload = await jwt.verify(bearer);
 
 		if (!payload) {
 			return { user: null, roles: [] as string[] };

@@ -104,3 +104,11 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Database
+
+The `src/db/schema.ts` file contains the definition of the database scheme. You can also check ../../docs/erd.dbml
+
+## API calls
+
+The API contract is defined in ../../docs/API.md. When generating new API endpoints or using already generated endpoints, always check that they align with their definition in this documentation.

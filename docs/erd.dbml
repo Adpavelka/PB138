@@ -97,10 +97,7 @@ Table article_category {
   id uuid [pk]
   category_name varchar [unique, not null]
   slug [unique, not null]
-
-  indexes {
-    slug [unique, name: "article_slug_idx"]
-  }
+  newspaper_id uuid [ref: > newspaper.id]
 }
 
 Table article_images {

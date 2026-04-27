@@ -17,5 +17,11 @@
     "test": "turbo test"
   },
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"]
+  "workspaces": ["apps/*", "packages/*"],
+  "dependencies": {
+    "nodemailer": "^8.0.5"
+  },
+  "overrides": {
+    "zod": "^3.25.0"
+  }
 }

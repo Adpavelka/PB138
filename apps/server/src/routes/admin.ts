@@ -1,8 +1,17 @@
 import { Elysia } from "elysia";
 import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
-import { users, userRoles, newspapers, articles, comments, likes } from "../db/schema";
-import { eq, and, count } from "drizzle-orm";
+import { users, userRoles, newspapers, articles } from "../db/schema";
+import { eq, and } from "drizzle-orm";
+import {
+    adminUsersListParams,
+    adminUsersListQuery,
+    assignRoleParams,
+    assignRoleBody,
+    removeRoleParams,
+    statisticsParams,
+    adminConfigBody,
+} from "@pb138/shared";
 
 // In-memory system config (in production this would be persisted to DB or env)
 let systemConfig = {
@@ -27,7 +36,7 @@ export const adminRoutes = new Elysia()
     .use(authMiddleware)
 
     // ── GET /api/newspapers/:newspaper_id/users — SYSTEM_ADMINISTRATOR ────
-    .get("/api/newspapers/:newspaper_id/users", async ({ params, user, roles, query }: any) => {
+    .get("/api/newspapers/:newspaper_id/users", async ({ params, user, roles, query }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
         if (!roles.includes("SYSTEM_ADMINISTRATOR"))
             return Response.json({ error: "FORBIDDEN" }, { status: 403 });
@@ -37,8 +46,7 @@ export const adminRoutes = new Elysia()
         });
         if (!newspaper) return Response.json({ error: "NEWSPAPER_NOT_FOUND" }, { status: 404 });
 
-        const page = parseInt(query?.page ?? "1");
-        const limit = Math.min(parseInt(query?.limit ?? "50"), 100);
+        const { page, limit } = query;
         const offset = (page - 1) * limit;
 
         const allUsers = await db.query.users.findMany({
@@ -49,8 +57,8 @@ export const adminRoutes = new Elysia()
         const paged = allUsers.slice(offset, offset + limit);
 
         const result = await Promise.all(
-            paged.map(async (u: any) => {
-                const roles = await db.query.userRoles.findMany({
+            paged.map(async (u) => {
+                const userRolesList = await db.query.userRoles.findMany({
                     where: and(
                         eq(userRoles.userId, u.id),
                         eq(userRoles.newspaperId, params.newspaper_id)
@@ -61,7 +69,7 @@ export const adminRoutes = new Elysia()
                     email: u.email,
                     username: u.username,
                     full_name: u.fullname,
-                    roles: roles.map((r: any) => r.role),
+                    roles: userRolesList.map((r) => r.role),
                     email_verified: u.email_verified,
                 };
             })
@@ -71,30 +79,20 @@ export const adminRoutes = new Elysia()
             data: result,
             pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
         });
+    }, {
+        params: adminUsersListParams,
+        query: adminUsersListQuery,
     })
 
     // ── POST /api/newspapers/:newspaper_id/users/:user_id/roles ───────────
     .post(
         "/api/newspapers/:newspaper_id/users/:user_id/roles",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
             if (!roles.includes("SYSTEM_ADMINISTRATOR"))
                 return Response.json({ error: "FORBIDDEN" }, { status: 403 });
 
-            const validRoles = [
-                "REGISTERED_USER",
-                "AUTHOR",
-                "EDITOR",
-                "NEWSPAPER_MANAGER",
-                "DIRECTOR",
-                "SYSTEM_ADMINISTRATOR",
-            ];
-            const { role } = body ?? {};
-            if (!role || !validRoles.includes(role))
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { role: "Invalid role" } },
-                    { status: 422 }
-                );
+            const { role } = body;
 
             const targetUser = await db.query.users.findFirst({ where: eq(users.id, params.user_id) });
             if (!targetUser) return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
@@ -123,15 +121,19 @@ export const adminRoutes = new Elysia()
 
             return Response.json({
                 user_id: params.user_id,
-                roles: allRoles.map((r: any) => r.role),
+                roles: allRoles.map((r) => r.role),
             });
+        },
+        {
+            params: assignRoleParams,
+            body: assignRoleBody,
         }
     )
 
     // ── DELETE /api/newspapers/:newspaper_id/users/:user_id/roles/:role ───
     .delete(
         "/api/newspapers/:newspaper_id/users/:user_id/roles/:role",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
             if (!roles.includes("SYSTEM_ADMINISTRATOR"))
                 return Response.json({ error: "FORBIDDEN" }, { status: 403 });
@@ -165,15 +167,18 @@ export const adminRoutes = new Elysia()
 
             return Response.json({
                 user_id: params.user_id,
-                roles: allRoles.map((r: any) => r.role),
+                roles: allRoles.map((r) => r.role),
             });
+        },
+        {
+            params: removeRoleParams,
         }
     )
 
     // ── GET /api/newspapers/:newspaper_id/statistics ───────────────────────
     .get(
         "/api/newspapers/:newspaper_id/statistics",
-        async ({ params, user, roles, query }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
             if (!roles.includes("NEWSPAPER_MANAGER") && !roles.includes("DIRECTOR"))
                 return Response.json({ error: "FORBIDDEN" }, { status: 403 });
@@ -188,12 +193,12 @@ export const adminRoutes = new Elysia()
                 with: { category: true },
             });
 
-            const published = allArticles.filter((a: any) => a.state === "PUBLISHED");
-            const drafts = allArticles.filter((a: any) => a.state === "DRAFT");
-            const inReview = allArticles.filter((a: any) =>
+            const published = allArticles.filter((a) => a.state === "PUBLISHED");
+            const drafts = allArticles.filter((a) => a.state === "DRAFT");
+            const inReview = allArticles.filter((a) =>
                 ["SUBMITTED", "IN_REVIEW", "APPROVED_BY_EDITOR", "APPROVED_BY_MANAGER"].includes(a.state)
             );
-            const rejected = allArticles.filter((a: any) => a.state === "REJECTED");
+            const rejected = allArticles.filter((a) => a.state === "REJECTED");
 
             // Count by category
             const categoryCount: Record<string, number> = {};
@@ -212,9 +217,9 @@ export const adminRoutes = new Elysia()
             const allComments = await db.query.comments.findMany();
             const allLikes = await db.query.likes.findMany();
 
-            const publishedIds = new Set(published.map((a: any) => a.id));
-            const totalComments = allComments.filter((c: any) => publishedIds.has(c.articleId)).length;
-            const totalLikes = allLikes.filter((l: any) => publishedIds.has(l.articleId)).length;
+            const publishedIds = new Set(published.map((a) => a.id));
+            const totalComments = allComments.filter((c) => publishedIds.has(c.articleId)).length;
+            const totalLikes = allLikes.filter((l) => publishedIds.has(l.articleId)).length;
 
             return Response.json({
                 newspaper_id: params.newspaper_id,
@@ -237,11 +242,14 @@ export const adminRoutes = new Elysia()
                     total_likes: totalLikes,
                 },
             });
+        },
+        {
+            params: statisticsParams,
         }
     )
 
     // ── GET /api/admin/config ─────────────────────────────────────────────
-    .get("/api/admin/config", async ({ user, roles }: any) => {
+    .get("/api/admin/config", async ({ user, roles }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
         if (!roles.includes("SYSTEM_ADMINISTRATOR"))
             return Response.json({ error: "FORBIDDEN" }, { status: 403 });
@@ -250,36 +258,22 @@ export const adminRoutes = new Elysia()
     })
 
     // ── PUT /api/admin/config ─────────────────────────────────────────────
-    .put("/api/admin/config", async ({ user, roles, body }: any) => {
+    .put("/api/admin/config", async ({ user, roles, body }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
         if (!roles.includes("SYSTEM_ADMINISTRATOR"))
             return Response.json({ error: "FORBIDDEN" }, { status: 403 });
 
-        const updates = body ?? {};
-
-        if (updates.email) {
-            if (
-                updates.email.smtp_port !== undefined &&
-                (isNaN(updates.email.smtp_port) ||
-                    updates.email.smtp_port < 1 ||
-                    updates.email.smtp_port > 65535)
-            ) {
-                return Response.json(
-                    {
-                        error: "VALIDATION_ERROR",
-                        fields: { "email.smtp_port": "Must be a valid port number (1–65535)" },
-                    },
-                    { status: 422 }
-                );
-            }
-            systemConfig.email = { ...systemConfig.email, ...updates.email };
+        if (body.email) {
+            systemConfig.email = { ...systemConfig.email, ...body.email };
         }
-        if (updates.security) {
-            systemConfig.security = { ...systemConfig.security, ...updates.security };
+        if (body.security) {
+            systemConfig.security = { ...systemConfig.security, ...body.security };
         }
-        if (updates.uploads) {
-            systemConfig.uploads = { ...systemConfig.uploads, ...updates.uploads };
+        if (body.uploads) {
+            systemConfig.uploads = { ...systemConfig.uploads, ...body.uploads };
         }
 
         return Response.json(systemConfig);
+    }, {
+        body: adminConfigBody,
     });

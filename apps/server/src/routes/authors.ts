@@ -2,11 +2,12 @@ import { Elysia } from "elysia";
 import { db } from "../db";
 import { newspapers, newspaperAuthors, articles, articleCategory, articleImages, users } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import { authorRouteParams, authorArticlesQuery } from "@pb138/shared";
 
 export const authorRoutes = new Elysia()
 
     // GET /api/newspapers/:newspaper_id/authors/:author_id — public
-    .get("/api/newspapers/:newspaper_id/authors/:author_id", async ({ params, query }: any) => {
+    .get("/api/newspapers/:newspaper_id/authors/:author_id", async ({ params, query }) => {
         const newspaper = await db.query.newspapers.findFirst({
             where: eq(newspapers.id, params.newspaper_id),
         });
@@ -23,9 +24,8 @@ export const authorRoutes = new Elysia()
         const user = await db.query.users.findFirst({ where: eq(users.id, params.author_id) });
         if (!user) return Response.json({ error: "AUTHOR_NOT_FOUND" }, { status: 404 });
 
-        const page = parseInt(query?.page ?? "1");
-        const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
-        const offset = (page - 1) * limit;
+		const { page, limit } = query;
+		const offset = (page - 1) * limit;
 
         const allArticles = await db.query.articles.findMany({
             where: and(
@@ -66,4 +66,7 @@ export const authorRoutes = new Elysia()
                 },
             },
         });
-    });
+    }, {
+		params: authorRouteParams,
+		query: authorArticlesQuery,
+	});

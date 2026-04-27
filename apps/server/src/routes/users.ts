@@ -3,12 +3,13 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { users, newspaperAuthors } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import { updateMeBody } from "@pb138/shared";
 
 export const userRoutes = new Elysia({ prefix: "/api/users" })
     .use(authMiddleware)
 
     // GET /api/users/me
-    .get("/me", async ({ user, roles }: any) => {
+    .get("/me", async ({ user, roles }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
         const authorProfile = await db.query.newspaperAuthors.findFirst({
@@ -31,10 +32,10 @@ export const userRoutes = new Elysia({ prefix: "/api/users" })
     })
 
     // PUT /api/users/me
-    .put("/me", async ({ user, body }: any) => {
+    .put("/me", async ({ user, body }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
-        const { username, full_name, bio, password } = body ?? {};
+        const { username, full_name, bio, password } = body;
 
         if (username) {
             const existing = await db.query.users.findFirst({
@@ -44,13 +45,7 @@ export const userRoutes = new Elysia({ prefix: "/api/users" })
                 return Response.json({ error: "USERNAME_TAKEN" }, { status: 409 });
         }
 
-        if (password && password.length < 8)
-            return Response.json(
-                { error: "VALIDATION_ERROR", fields: { password: "Must be at least 8 characters" } },
-                { status: 422 }
-            );
-
-        const updateData: Record<string, any> = {};
+        const updateData: Partial<typeof users.$inferInsert> = {};
         if (username !== undefined) updateData.username = username;
         if (full_name !== undefined) updateData.fullname = full_name;
         if (password) updateData.passwordHash = await Bun.password.hash(password);
@@ -83,10 +78,12 @@ export const userRoutes = new Elysia({ prefix: "/api/users" })
             full_name: updated!.fullname,
             bio,
         });
-    })
+    }, {
+		body: updateMeBody,
+	})
 
     // POST /api/users/me/profile-picture
-    .post("/me/profile-picture", async ({ user, request }: any) => {
+    .post("/me/profile-picture", async ({ user, request }) => {
         if (!user) return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
         let profilePictureUrl: string | null = null;

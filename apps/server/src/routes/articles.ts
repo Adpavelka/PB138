@@ -14,6 +14,13 @@ import {
     userRoles,
 } from "../db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
+import {
+	newspaperOnlyParams, articleRouteParams, articleImageParams,
+	articlesListQuery, articlesSearchQuery, articlesMineQuery,
+	articlesQueueQuery,
+	createArticleBody, updateArticleBody, assignEditorBody, reviewBody,
+	scheduleBody,
+} from "@pb138/shared";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -42,18 +49,11 @@ export const articleRoutes = new Elysia()
     // ── GET /api/newspapers/:newspaper_id/articles/search ─────────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/search",
-        async ({ params, query }: any) => {
+        async ({ params, query }) => {
             const newspaper = await db.query.newspapers.findFirst({
                 where: eq(newspapers.id, params.newspaper_id),
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
-
-            const q = query?.q;
-            if (!q?.trim()) return Response.json({ error: "MISSING_QUERY" }, { status: 400 });
-
-            const page = parseInt(query?.page ?? "1");
-            const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
-            const offset = (page - 1) * limit;
 
             const all = await db.query.articles.findMany({
                 where: and(
@@ -63,6 +63,8 @@ export const articleRoutes = new Elysia()
                 with: { category: true, images: true, author: true },
             });
 
+			const { q, page, limit } = query;
+			const offset = (page - 1) * limit;
             const lower = q.toLowerCase();
             let filtered = all.filter((a: any) => {
                 return (
@@ -110,13 +112,15 @@ export const articleRoutes = new Elysia()
                 }),
                 pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
             });
-        }
-    )
+        }, {
+			params: newspaperOnlyParams,
+			query: articlesSearchQuery
+		})
 
     // ── GET /api/newspapers/:newspaper_id/articles/mine ───────────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/mine",
-        async ({ params, user, roles, query }: any) => {
+        async ({ params, user, roles, query }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
 
@@ -125,8 +129,7 @@ export const articleRoutes = new Elysia()
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
 
-            const page = parseInt(query?.page ?? "1");
-            const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
+			const { page, limit, status } = query;
             const offset = (page - 1) * limit;
 
             const all = await db.query.articles.findMany({
@@ -138,8 +141,8 @@ export const articleRoutes = new Elysia()
                 orderBy: [desc(articles.createdAt)],
             });
 
-            const filtered = query?.status
-                ? all.filter((a: any) => a.state === query.status)
+            const filtered = status
+                ? all.filter((a: any) => a.state === status)
                 : all;
 
             const total = filtered.length;
@@ -168,13 +171,15 @@ export const articleRoutes = new Elysia()
                 data: result,
                 pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
             });
-        }
-    )
+        }, {
+			params: newspaperOnlyParams,
+			query: articlesMineQuery,
+		})
 
     // ── GET /api/newspapers/:newspaper_id/articles/queue ─────────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/queue",
-        async ({ params, user, roles, query }: any) => {
+        async ({ params, user, roles, query }) => {
             if (!user) return unauthorized();
 
             const isEditor = roles.includes("EDITOR");
@@ -188,8 +193,7 @@ export const articleRoutes = new Elysia()
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
 
-            const page = parseInt(query?.page ?? "1");
-            const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
+			const { page, limit, status } = query;
             const offset = (page - 1) * limit;
 
             let allowedStates: string[] = [];
@@ -197,8 +201,8 @@ export const articleRoutes = new Elysia()
             else if (isManager) allowedStates = ["SUBMITTED", "APPROVED_BY_EDITOR"];
             else if (isDirector) allowedStates = ["APPROVED_BY_MANAGER"];
 
-            if (query?.status && allowedStates.includes(query.status)) {
-                allowedStates = [query.status];
+            if (status && allowedStates.includes(status)) {
+                allowedStates = [status];
             }
 
             const all = await db.query.articles.findMany({
@@ -232,20 +236,21 @@ export const articleRoutes = new Elysia()
                 })),
                 pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
             });
-        }
-    )
+        }, {
+			params: newspaperOnlyParams,
+			query: articlesQueueQuery,
+		})
 
     // ── GET /api/newspapers/:newspaper_id/articles ────────────────────────
     .get(
         "/api/newspapers/:newspaper_id/articles",
-        async ({ params, query }: any) => {
+        async ({ params, query }) => {
             const newspaper = await db.query.newspapers.findFirst({
                 where: eq(newspapers.id, params.newspaper_id),
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
 
-            const page = parseInt(query?.page ?? "1");
-            const limit = Math.min(parseInt(query?.limit ?? "20"), 50);
+			const { page, limit, category } = query;
             const offset = (page - 1) * limit;
 
             const all = await db.query.articles.findMany({
@@ -257,10 +262,10 @@ export const articleRoutes = new Elysia()
                 orderBy: [desc(articles.publicationDate)],
             });
 
-            const filtered = query?.category
+            const filtered = category
                 ? all.filter(
                       (a: any) =>
-                          a.category?.categoryName?.toLowerCase() === query.category.toLowerCase()
+                          a.category?.categoryName?.toLowerCase() === category.toLowerCase()
                   )
                 : all;
 
@@ -295,16 +300,17 @@ export const articleRoutes = new Elysia()
                 data: result,
                 pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
             });
-        }
-    )
+        }, {
+			params: newspaperOnlyParams,
+			query: articlesListQuery,
+		})
 
     // ── GET /api/newspapers/:newspaper_id/articles/:article_id ────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/:article_id",
-        async ({ params, user }: any) => {
+        async ({ params, user }) => {
             if (!user) return unauthorized();
             if (user.newspaperId !== params.newspaper_id) return forbidden();
-
             const article = await db.query.articles.findFirst({
                 where: and(
                     eq(articles.id, params.article_id),
@@ -314,7 +320,6 @@ export const articleRoutes = new Elysia()
                 with: { category: true, images: true },
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
-
             const author = await db.query.users.findFirst({ where: eq(users.id, article.authorId) });
             const authorProfile = author
                 ? await db.query.newspaperAuthors.findFirst({
@@ -330,9 +335,10 @@ export const articleRoutes = new Elysia()
                 .from(likes)
                 .where(eq(likes.articleId, article.id));
 
-            const likedByMe = !!(await db.query.likes.findFirst({
-                where: and(eq(likes.userId, user.id), eq(likes.articleId, article.id)),
-            }));
+            ///const likedByMe = !!(await db.query.likes.findFirst({
+            ///    where: and(eq(likes.userId, user.id), eq(likes.articleId, article.id)),
+            ///}));
+            const likedByMe = false;
 
             const articleComments = await db.query.comments.findMany({
                 where: eq(comments.articleId, article.id),
@@ -347,6 +353,7 @@ export const articleRoutes = new Elysia()
                 content: article.content,
                 publication_date: article.publicationDate,
                 category: (article as any).category?.categoryName ?? null,
+                category_slug: (article as any).category?.slug ?? null,
                 keywords: article.keywords
                     ? article.keywords.split(",").map((k: string) => k.trim())
                     : [],
@@ -371,13 +378,14 @@ export const articleRoutes = new Elysia()
                     author: { id: c.user?.id, username: c.user?.username },
                 })),
             });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+		})
 
     // ── POST /api/newspapers/:newspaper_id/articles ───────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
             if (user.newspaperId !== params.newspaper_id) return forbidden();
@@ -387,25 +395,7 @@ export const articleRoutes = new Elysia()
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
 
-            const { title, perex, content, category_id, keywords } = body ?? {};
-            if (!title?.trim()) {
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { title: "Title is required" } },
-                    { status: 422 }
-                );
-            }
-            if (!perex?.trim()) {
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { perex: "Perex is required" } },
-                    { status: 422 }
-                );
-            }
-            if (!content?.trim()) {
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { content: "Content is required" } },
-                    { status: 422 }
-                );
-            }
+            const { title, perex, content, category_id, keywords } = body;
 
             if (category_id) {
                 const cat = await db.query.articleCategory.findFirst({
@@ -449,13 +439,15 @@ export const articleRoutes = new Elysia()
                 },
                 { status: 201 }
             );
-        }
-    )
+        }, {
+			params: newspaperOnlyParams,
+			body: createArticleBody,
+		})
 
     // ── PUT /api/newspapers/:newspaper_id/articles/:article_id ────────────
     .put(
         "/api/newspapers/:newspaper_id/articles/:article_id",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
 
@@ -470,17 +462,9 @@ export const articleRoutes = new Elysia()
             if (article.authorId !== user.id) return forbidden();
             if (article.state !== "DRAFT") return forbidden();
 
-            const { title, perex, content, category_id, keywords } = body ?? {};
+            const { title, perex, content, category_id, keywords } = body;
 
-            // Validate non-empty strings if provided
-            if (title !== undefined && !title.trim()) {
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { title: "Title cannot be empty" } },
-                    { status: 422 }
-                );
-            }
-
-            const updateData: Record<string, any> = {};
+            const updateData: Partial<typeof articles.$inferInsert> = {};
             if (title !== undefined) updateData.title = title;
             if (perex !== undefined) updateData.perex = perex;
             if (content !== undefined) updateData.content = content;
@@ -509,13 +493,15 @@ export const articleRoutes = new Elysia()
                 status: updated!.state,
                 updated_at: updated!.createdAt,
             });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+			body: updateArticleBody,
+		})
 
     // ── DELETE /api/newspapers/:newspaper_id/articles/:article_id ─────────
     .delete(
         "/api/newspapers/:newspaper_id/articles/:article_id",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return unauthorized();
 
             const article = await db.query.articles.findFirst({
@@ -532,13 +518,14 @@ export const articleRoutes = new Elysia()
 
             await db.delete(articles).where(eq(articles.id, params.article_id));
             return new Response(null, { status: 204 });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+		})
 
     // ── POST .../articles/:article_id/submit ─────────────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/submit",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
 
@@ -565,13 +552,14 @@ export const articleRoutes = new Elysia()
                 .where(eq(articles.id, article.id));
 
             return Response.json({ id: article.id, status: "SUBMITTED" });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+		})
 
     // ── POST .../articles/:article_id/images ─────────────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/images",
-        async ({ params, user, roles, request }: any) => {
+        async ({ params, user, roles, request }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
 
@@ -640,13 +628,14 @@ export const articleRoutes = new Elysia()
                 { id: image!.id, url: image!.url, caption: image!.caption, is_primary: image!.isPrimary },
                 { status: 201 }
             );
-        }
-    )
+        }, {
+			params: articleRouteParams,
+		})
 
     // ── DELETE .../articles/:article_id/images/:image_id ─────────────────
     .delete(
         "/api/newspapers/:newspaper_id/articles/:article_id/images/:image_id",
-        async ({ params, user, roles }: any) => {
+        async ({ params, user, roles }) => {
             if (!user) return unauthorized();
             if (!roles.includes("AUTHOR")) return forbidden();
 
@@ -684,13 +673,14 @@ export const articleRoutes = new Elysia()
             }
 
             return new Response(null, { status: 204 });
-        }
-    )
+        }, {
+			params: articleImageParams,
+		})
 
     // ── POST .../articles/:article_id/assign-editor ───────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/assign-editor",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
             if (!roles.includes("NEWSPAPER_MANAGER")) return forbidden();
 
@@ -705,24 +695,19 @@ export const articleRoutes = new Elysia()
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
             }
 
-            const { editor_id } = body ?? {};
-            if (!editor_id) {
-                return Response.json(
-                    { error: "VALIDATION_ERROR", fields: { editor_id: "Required" } },
-                    { status: 422 }
-                );
-            }
+			const { editor_id } = body;
 
-            const editorRole = await db.query.userRoles.findFirst({
-                where: and(
-                    eq(userRoles.userId, editor_id),
-                    eq(userRoles.newspaperId, params.newspaper_id),
-                    eq(userRoles.role, "EDITOR")
-                ),
-            });
-            if (!editorRole) {
-                return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            }
+			const editorRole = await db.query.userRoles.findFirst({
+				where: and(
+				eq(userRoles.userId, editor_id),
+				eq(userRoles.newspaperId, params.newspaper_id),
+				eq(userRoles.role, "EDITOR")
+				),
+			});
+
+			if (!editorRole) {
+				return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
+			}
 
             // FIX: only update the article state – do NOT insert a fake review record here.
             // The actual review record is created when the editor calls POST /review.
@@ -738,13 +723,15 @@ export const articleRoutes = new Elysia()
                 status: "IN_REVIEW",
                 assigned_editor: { id: editor!.id, full_name: editor!.fullname },
             });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+			body: assignEditorBody,
+		})
 
     // ── POST .../articles/:article_id/review ─────────────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/review",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
             if (!roles.includes("EDITOR")) return forbidden();
 
@@ -759,13 +746,7 @@ export const articleRoutes = new Elysia()
                 return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
             }
 
-            const { decision, note } = body ?? {};
-            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision)) {
-                return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            }
-            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note?.trim()) {
-                return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            }
+            const { decision, note } = body;
 
             const stateMap: Record<string, string> = {
                 APPROVE: "APPROVED_BY_EDITOR",
@@ -788,13 +769,15 @@ export const articleRoutes = new Elysia()
             });
 
             return Response.json({ id: article.id, status: newState, note: note ?? null });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+			body: reviewBody,
+		})
 
     // ── POST .../articles/:article_id/approve ─────────────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/approve",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
 
             const isManager = roles.includes("NEWSPAPER_MANAGER");
@@ -809,13 +792,7 @@ export const articleRoutes = new Elysia()
             });
             if (!article) return notFound("ARTICLE_NOT_FOUND");
 
-            const { decision, note } = body ?? {};
-            if (!["APPROVE", "REJECT", "REQUEST_REVISION"].includes(decision)) {
-                return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            }
-            if ((decision === "REJECT" || decision === "REQUEST_REVISION") && !note?.trim()) {
-                return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
-            }
+            const { decision, note } = body;
 
             let expectedState: string;
             let nextState: string;
@@ -860,13 +837,15 @@ export const articleRoutes = new Elysia()
             });
 
             return Response.json({ id: article.id, status: nextState });
-        }
-    )
+        }, {
+			params: articleRouteParams,
+			body: reviewBody,
+		})
 
     // ── POST .../articles/:article_id/schedule ────────────────────────────
     .post(
         "/api/newspapers/:newspaper_id/articles/:article_id/schedule",
-        async ({ params, user, roles, body }: any) => {
+        async ({ params, user, roles, body }) => {
             if (!user) return unauthorized();
             if (!roles.includes("NEWSPAPER_MANAGER")) return forbidden();
 
@@ -882,13 +861,8 @@ export const articleRoutes = new Elysia()
                 return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
             }
 
-            const { publication_date } = body ?? {};
-            if (!publication_date) {
-                return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
-            }
-
-            const pubDate = new Date(publication_date);
-            if (isNaN(pubDate.getTime()) || pubDate <= new Date()) {
+            const pubDate = new Date(body.publication_date);
+            if (pubDate <= new Date()) {
                 return Response.json({ error: "INVALID_PUBLICATION_DATE" }, { status: 422 });
             }
 
@@ -902,5 +876,7 @@ export const articleRoutes = new Elysia()
                 status: article.state,
                 publication_date: pubDate.toISOString(),
             });
-        }
-    );
+        }, {
+			params: articleRouteParams,
+			body: scheduleBody,
+		});

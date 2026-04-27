@@ -118,8 +118,11 @@ The system is a web-based platfrom for a publication house. The house consists o
 - Registered User - a user of the newspaper with a valid account, a registered user can view the whole articles
 - Visitor - a user without an account, a visitor can view the homepage but cannot access the full articles
 
-A deeper description of the functional requirements of the system is described in docs/FUNCTIONAL_REQUIREMENTS.md
+# Documentation
 
-A list of use cases in described in docs/use_case_specification.pdf
-
-The database scheme is described in docs/erd.dbml
+The folder docs/ contains all relevant documentation for the project.
+- the *design of the pages* is defined inside the docs/design/design.pen - it is a file created using the app Pencil and contains visualizations of pages on the frontend
+- the documentation for *use cases* is defined inside the folder docs/Use_case. The pdf file use_case.PNG contains the use case diagram, the file use_case_specification.pdf contains detailed descriptions of the use cases, including actors, preconditions and postconditions
+- the *functional requirements* are defined in the file docs/FUNCTIONAL_REQUIREMENTS.md, here you can find the description of the whole project
+- the *api contract* is defined in docs/API.md. This file is vital when generating and working with api calls. Always check that the api calls you generate or call are aligned with their definition in this file
+- the *database scheme* is described in docs/erd.dbml 
