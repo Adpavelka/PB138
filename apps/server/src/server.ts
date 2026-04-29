@@ -11,7 +11,7 @@ import { likeRoutes } from "./routes/likes.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authorRoutes } from "./routes/authors.ts";
 import { cors } from "@elysiajs/cors";
-import { swagger } from "@elysiajs/swagger";
+import { openapi } from "@elysiajs/openapi";
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -21,9 +21,29 @@ if (!DATABASE_URL) {
     process.exit(1);
 }
 
-const app = new Elysia()
+export const app = new Elysia()
     .use(cors())
-    .use(swagger())
+    .use(
+        openapi({
+            documentation: {
+                info: {
+                    title: "Newspaper API",
+                    version: "1.0.0",
+                },
+                tags: [
+                    { name: "Auth", description: "Registration, login, password reset, email verification" },
+                    { name: "Users", description: "Current-user profile and account operations" },
+                    { name: "Newspapers", description: "Newspaper listing and metadata" },
+                    { name: "Articles", description: "Article CRUD, submission, review, and scheduling" },
+                    { name: "Categories", description: "Article categories per newspaper" },
+                    { name: "Comments", description: "Comments on articles and moderation" },
+                    { name: "Likes", description: "Liking and unliking articles" },
+                    { name: "Authors", description: "Author profiles and their article listings" },
+                    { name: "Admin", description: "System administration: roles, users, configuration" },
+                ],
+            },
+        })
+    )
     .use(authRoutes)
     .use(userRoutes)
     .use(newspaperRoutes)
@@ -48,6 +68,8 @@ const app = new Elysia()
         }
     })
     .listen(PORT);
+
+export type App = typeof app;
 
 console.log(`Server running on http://localhost:${app.server?.port}`);
 console.log(`Database: ${DATABASE_URL.replace(/:\/\/.*@/, "://<redacted>@")}`);

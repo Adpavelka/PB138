@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User } from "lucide-react";
+import { UserIcon } from "../components/Icons";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../lib/api";
 import type { AuthorPublicProfile, Article } from "../types";
@@ -42,11 +42,13 @@ export function AuthorPage() {
 
   const [author, setAuthor] = useState<AuthorPublicProfile | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!newspaper || !authorId) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthor(null);
+    setError(false);
     setSortOrder("latest");
 
     fetch(`${API_BASE_URL}/api/newspapers/${newspaper.id}/authors/${authorId}`)
@@ -55,11 +57,22 @@ export function AuthorPage() {
         return res.json() as Promise<AuthorPublicProfile>;
       })
       .then((data) => setAuthor(data))
-      .catch(() => {});
+      .catch(() => setError(true));
   }, [newspaper, authorId]);
 
   const sorted = sortArticles(author?.articles.data, sortOrder);
   const [featured, ...rest] = sorted;
+
+  if (error) {
+    return (
+      <div className="bg-background text-foreground min-h-screen w-full">
+        <Navbar newspaperName={newspaperName} />
+        <p className="text-muted-foreground py-16 text-center">
+          Author not found.
+        </p>
+      </div>
+    );
+  }
 
   if (!author) {
     return (
@@ -89,7 +102,7 @@ export function AuthorPage() {
             />
           ) : (
             <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-white/20 ring-2 ring-white/20">
-              <User size={40} className="text-white/60" />
+              <UserIcon size={40} className="text-white/60" />
             </div>
           )}
 
@@ -173,7 +186,7 @@ export function AuthorPage() {
                     />
                   ) : (
                     <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">
-                      <User size={16} className="text-muted-foreground" />
+                      <UserIcon size={16} className="text-muted-foreground" />
                     </div>
                   )}
                   <div className="flex flex-col gap-0.5">

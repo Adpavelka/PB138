@@ -3,7 +3,7 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { articleCategory, articles, newspapers } from "../db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { categoryListParams, categoryRouteParams, categoryBody } from "@pb138/shared";
+import { categoryListParams, categoryRouteParams, categoryBody } from "../schemas/categories";
 
 // Helper: slugify
 const slugify = (text: string): string =>
@@ -16,7 +16,7 @@ const slugify = (text: string): string =>
         .replace(/[\s_]+/g, "-")
         .replace(/-+/g, "-");
 
-export const categoryRoutes = new Elysia()
+export const categoryRoutes = new Elysia({ detail: { tags: ["Categories"] } })
     .use(authMiddleware)
 
     // GET /api/newspapers/:newspaper_id/categories/by-slug/:slug — public

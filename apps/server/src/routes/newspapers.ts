@@ -3,9 +3,9 @@ import { authMiddleware } from "../middleware/auth";
 import { db } from "../db";
 import { newspapers, users, userRoles } from "../db/schema";
 import { eq, and } from "drizzle-orm";
-import { newspaperIdParam } from "@pb138/shared";
+import { newspaperIdParam } from "../schemas/newspapers";
 
-export const newspaperRoutes = new Elysia()
+export const newspaperRoutes = new Elysia({ detail: { tags: ["Newspapers"] } })
     .use(authMiddleware)
 
     // GET /api/newspapers — DIRECTOR only

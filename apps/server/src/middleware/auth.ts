@@ -4,6 +4,7 @@ import { bearer } from "@elysiajs/bearer";
 import { db } from "../db";
 import { users, userRoles } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import { isJtiBlocklisted } from "../utils/redis";
 
 export const authMiddleware = new Elysia({ name: "auth"})
 	.use(bearer())
@@ -16,6 +17,10 @@ export const authMiddleware = new Elysia({ name: "auth"})
 		const payload = await jwt.verify(bearer);
 
 		if (!payload) {
+			return { user: null, roles: [] as string[] };
+		}
+
+		if (payload.jti && (await isJtiBlocklisted(payload.jti as string))) {
 			return { user: null, roles: [] as string[] };
 		}
 

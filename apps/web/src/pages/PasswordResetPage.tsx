@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../lib/api";
 import { Navbar } from "../components/Navbar";
+import { CheckIcon } from "../components/Icons";
 
 // TODO: replace with a real newspaper_id once a public lookup-by-name endpoint exists
 const NEWSPAPER_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -79,20 +80,7 @@ export function PasswordResetPage() {
             /* Success state */
             <div className="flex flex-col items-center gap-4">
               <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-foreground"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <CheckIcon size={22} className="text-foreground" />
               </div>
               <p className="text-muted-foreground text-center text-[14px]">
                 If that address is registered, a reset link has been sent. Check

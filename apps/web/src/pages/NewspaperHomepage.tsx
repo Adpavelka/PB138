@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRightIcon } from "../components/Icons";
 import { API_BASE_URL } from "../lib/api";
 import { sampleArticles } from "../lib/sampleData";
 import type { Article, ArticlesResponse } from "../types/article";
@@ -89,19 +90,7 @@ export function NewspaperHomepage() {
               className="bg-foreground text-background flex w-fit items-center gap-2 rounded-lg px-5 py-2.5 text-[14px] font-semibold hover:opacity-90"
             >
               Read Full Article
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
+              <ArrowRightIcon />
             </Link>
           </div>
         </section>

@@ -141,8 +141,8 @@ export const articleReviews = pgTable("article_reviews", {
         .notNull()
         .references(() => users.id, { onDelete: "cascade" }),
     feedback: text("feedback"),
-    decision: reviewDecisionsEnum("decision").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    decision: reviewDecisionsEnum("decision"),
+    createdAt: timestamp("created_at").defaultNow(),
 });
 
 export type ArticleReview = InferSelectModel<typeof articleReviews>;

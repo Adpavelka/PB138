@@ -9,6 +9,7 @@ import { SearchResultsPage } from "./pages/SearchResultsPage";
 import { PasswordResetPage } from "./pages/PasswordResetPage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { AuthorDashboardPage } from "./pages/AuthorDashboardPage";
+import { ArticleEditorPage } from "./pages/ArticleEditorPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import "./index.css";
 
@@ -16,6 +17,14 @@ export function App() {
   return (
     <Routes>
       <Route path="/:newspaperName" element={<NewspaperHomepage />} />
+      <Route
+        path="/:newspaperName/articles/new"
+        element={<ArticleEditorPage />}
+      />
+      <Route
+        path="/:newspaperName/articles/:articleId/edit"
+        element={<ArticleEditorPage />}
+      />
       <Route
         path="/:newspaperName/articles/:articleId"
         element={<ArticlePage />}

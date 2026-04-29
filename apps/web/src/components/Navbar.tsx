@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon, LayoutDashboardIcon } from "./Icons";
 import { useNewspaper } from "../hooks/useNewspaper";
 import { API_BASE_URL, authHeaders } from "../lib/api";
 
@@ -13,6 +13,7 @@ interface Category {
 interface UserInfo {
   full_name: string | null;
   username: string;
+  roles: string[];
 }
 
 interface NavbarProps {
@@ -109,6 +110,23 @@ export function Navbar({ newspaperName, displayName }: NavbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {user?.roles.some((r) =>
+          [
+            "AUTHOR",
+            "EDITOR",
+            "NEWSPAPER_MANAGER",
+            "DIRECTOR",
+            "SYSTEM_ADMINISTRATOR",
+          ].includes(r)
+        ) && (
+          <Link
+            to={`/${newspaperName}/author-dashboard`}
+            className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-md px-4 py-2 text-[14px] font-medium hover:opacity-90"
+          >
+            <LayoutDashboardIcon size={16} />
+            Dashboard
+          </Link>
+        )}
         {user ? (
           <div className="relative">
             <button
@@ -123,7 +141,7 @@ export function Navbar({ newspaperName, displayName }: NavbarProps) {
               <span className="text-foreground text-[14px] font-medium">
                 {user.full_name ?? user.username}
               </span>
-              <ChevronDown size={16} className="text-muted-foreground" />
+              <ChevronDownIcon size={16} className="text-muted-foreground" />
             </button>
             {menuOpen && (
               <div className="border-border bg-background absolute right-0 mt-1 w-44 rounded-lg border shadow-md">

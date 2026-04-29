@@ -5,6 +5,7 @@ import { bearer } from "@elysiajs/bearer";
 import { db } from "../db";
 import { users, userRoles, newspapers } from "../db/schema";
 import { eq, and, or } from "drizzle-orm";
+import { blocklistJti } from "../utils/redis";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../utils/email";
 import {
 	registerInput,
@@ -13,14 +14,11 @@ import {
 	forgotPasswordInput,
 	resetPasswordInput,
 	resendVerificationInput,
-} from "@pb138/shared";
+} from "../schemas/auth";
 
-export const authRoutes = new Elysia({ prefix: "/api/auth" })
+export const authRoutes = new Elysia({ prefix: "/api/auth", detail: { tags: ["Auth"] } })
 	.use(bearer())
 	.use(jwt({ secret: process.env.JWT_SECRET! }))
-
-	// TODO: validations (will be generated from Drizzle + Zod)
-	// TODO: add token blocklist (Redis)
 
 	.post("/register", async ({ body, jwt }) => {
 		const { email, username, password, newspaper_id, full_name } = body;
@@ -130,6 +128,7 @@ export const authRoutes = new Elysia({ prefix: "/api/auth" })
 		const token = await jwt.sign({
 			userId: user.id,
 			newspaperId: newspaper_id,
+			jti: crypto.randomUUID(),
 			exp: JWT_EXPIRATION.session,
 		});
 
@@ -156,6 +155,11 @@ export const authRoutes = new Elysia({ prefix: "/api/auth" })
 
 		if (!payload) {
 			return Response.json({ error: "Invalid token" }, { status: 401 });
+		}
+
+		if (payload.jti && payload.exp) {
+			const ttl = Math.max(0, Number(payload.exp) - Math.floor(Date.now() / 1000));
+			await blocklistJti(payload.jti as string, ttl);
 		}
 
 		return Response.json({ message: "Logged out successfully" });

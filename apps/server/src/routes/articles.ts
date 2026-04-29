@@ -20,7 +20,7 @@ import {
 	articlesQueueQuery,
 	createArticleBody, updateArticleBody, assignEditorBody, reviewBody,
 	scheduleBody,
-} from "@pb138/shared";
+} from "../schemas/articles";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ const unauthorized = () => Response.json({ error: "UNAUTHORIZED" }, { status: 40
 
 // ─── routes ─────────────────────────────────────────────────────────────────
 
-export const articleRoutes = new Elysia()
+export const articleRoutes = new Elysia({ detail: { tags: ["Articles"] } })
     .use(authMiddleware)
 
     // ── GET /api/newspapers/:newspaper_id/articles/search ─────────────────
@@ -176,6 +176,48 @@ export const articleRoutes = new Elysia()
 			query: articlesMineQuery,
 		})
 
+    // ── GET /api/newspapers/:newspaper_id/articles/mine/:article_id ──────
+    .get(
+        "/api/newspapers/:newspaper_id/articles/mine/:article_id",
+        async ({ params, user, roles }) => {
+            if (!user) return unauthorized();
+            if (!roles.includes("AUTHOR")) return forbidden();
+
+            const article = await db.query.articles.findFirst({
+                where: and(
+                    eq(articles.id, params.article_id),
+                    eq(articles.newspaperId, params.newspaper_id),
+                    eq(articles.authorId, user.id)
+                ),
+                with: { category: true },
+            });
+            if (!article) return notFound("ARTICLE_NOT_FOUND");
+
+            const images = await db.query.articleImages.findMany({
+                where: eq(articleImages.articleId, article.id),
+            });
+
+            return Response.json({
+                id: article.id,
+                title: article.title,
+                perex: article.perex,
+                content: article.content,
+                keywords: article.keywords
+                    ? article.keywords.split(",").map((k: string) => k.trim())
+                    : null,
+                category_id: article.categoryId ?? null,
+                status: article.state,
+                images: images.map((i: any) => ({
+                    id: i.id,
+                    url: i.url,
+                    caption: i.caption,
+                    is_primary: i.isPrimary,
+                })),
+            });
+        }, {
+            params: articleRouteParams,
+        })
+
     // ── GET /api/newspapers/:newspaper_id/articles/queue ─────────────────
     .get(
         "/api/newspapers/:newspaper_id/articles/queue",
@@ -185,21 +227,29 @@ export const articleRoutes = new Elysia()
             const isEditor = roles.includes("EDITOR");
             const isManager = roles.includes("NEWSPAPER_MANAGER");
             const isDirector = roles.includes("DIRECTOR");
-
             if (!isEditor && !isManager && !isDirector) return forbidden();
 
             const newspaper = await db.query.newspapers.findFirst({
                 where: eq(newspapers.id, params.newspaper_id),
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
-
-			const { page, limit, status } = query;
+			const { page, limit, status, view } = query;
             const offset = (page - 1) * limit;
 
+            let effectiveRole: string;
+            if (view) {
+                if (!roles.includes(view)) return forbidden();
+                effectiveRole = view;
+            } else {
+                if (isDirector) effectiveRole = "DIRECTOR";
+                else if (isManager) effectiveRole = "NEWSPAPER_MANAGER";
+                else effectiveRole = "EDITOR";
+            }
+
             let allowedStates: string[] = [];
-            if (isEditor) allowedStates = ["IN_REVIEW"];
-            else if (isManager) allowedStates = ["SUBMITTED", "APPROVED_BY_EDITOR"];
-            else if (isDirector) allowedStates = ["APPROVED_BY_MANAGER"];
+            if (effectiveRole === "EDITOR") allowedStates = ["IN_REVIEW"];
+            else if (effectiveRole === "NEWSPAPER_MANAGER") allowedStates = ["SUBMITTED", "APPROVED_BY_EDITOR"];
+            else if (effectiveRole === "DIRECTOR") allowedStates = ["APPROVED_BY_MANAGER"];
 
             if (status && allowedStates.includes(status)) {
                 allowedStates = [status];
@@ -212,8 +262,7 @@ export const articleRoutes = new Elysia()
 
             let filtered = all.filter((a: any) => allowedStates.includes(a.state));
 
-            if (isEditor && !isManager && !isDirector) {
-                // Editors only see articles whose most recent review was assigned to them
+            if (effectiveRole === "EDITOR") {
                 const assignedReviews = await db.query.articleReviews.findMany({
                     where: eq(articleReviews.reviewerId, user.id),
                 });
@@ -249,7 +298,6 @@ export const articleRoutes = new Elysia()
                 where: eq(newspapers.id, params.newspaper_id),
             });
             if (!newspaper) return notFound("NEWSPAPER_NOT_FOUND");
-
 			const { page, limit, category } = query;
             const offset = (page - 1) * limit;
 
@@ -265,7 +313,7 @@ export const articleRoutes = new Elysia()
             const filtered = category
                 ? all.filter(
                       (a: any) =>
-                          a.category?.categoryName?.toLowerCase() === category.toLowerCase()
+                          a.category?.slug === category
                   )
                 : all;
 
@@ -542,9 +590,10 @@ export const articleRoutes = new Elysia()
             const images = await db.query.articleImages.findMany({
                 where: eq(articleImages.articleId, article.id),
             });
-            if (images.length === 0) {
-                return Response.json({ error: "ARTICLE_MISSING_IMAGE" }, { status: 422 });
-            }
+            
+            //if (images.length === 0) {
+            //    return Response.json({ error: "ARTICLE_MISSING_IMAGE" }, { status: 422 });
+            //}
 
             await db
                 .update(articles)
@@ -704,17 +753,21 @@ export const articleRoutes = new Elysia()
 				eq(userRoles.role, "EDITOR")
 				),
 			});
-
 			if (!editorRole) {
 				return Response.json({ error: "INVALID_ARTICLE_STATE" }, { status: 422 });
 			}
 
-            // FIX: only update the article state – do NOT insert a fake review record here.
-            // The actual review record is created when the editor calls POST /review.
             await db
                 .update(articles)
                 .set({ state: "IN_REVIEW" })
                 .where(eq(articles.id, article.id));
+
+            await db.insert(articleReviews).values({
+                articleId: article.id,
+                reviewerId: editor_id,
+                decision: null,
+                feedback: null,
+            });
 
             const editor = await db.query.users.findFirst({ where: eq(users.id, editor_id) });
 

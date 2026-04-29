@@ -11,7 +11,7 @@ import {
     removeRoleParams,
     statisticsParams,
     adminConfigBody,
-} from "@pb138/shared";
+} from "../schemas/admin";
 
 // In-memory system config (in production this would be persisted to DB or env)
 let systemConfig = {
@@ -32,7 +32,7 @@ let systemConfig = {
     },
 };
 
-export const adminRoutes = new Elysia()
+export const adminRoutes = new Elysia({ detail: { tags: ["Admin"] } })
     .use(authMiddleware)
 
     // ── GET /api/newspapers/:newspaper_id/users — SYSTEM_ADMINISTRATOR ────

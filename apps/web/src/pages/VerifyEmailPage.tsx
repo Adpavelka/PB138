@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { API_BASE_URL } from "../lib/api";
 import { Navbar } from "../components/Navbar";
+import { CheckIcon } from "../components/Icons";
 
 export function VerifyEmailPage() {
   const { newspaperName } = useParams<{ newspaperName: string }>();
@@ -68,20 +69,7 @@ export function VerifyEmailPage() {
           {status === "success" && (
             <>
               <div className="bg-muted mx-auto flex h-12 w-12 items-center justify-center rounded-full">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-foreground"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <CheckIcon size={22} className="text-foreground" />
               </div>
               <h2 className="text-foreground text-[22px] font-extrabold tracking-tight">
                 Email verified!

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../lib/api";
 import type { Article, PaginatedResponse } from "../types";
 import { ArticleCard } from "../components/ArticleCard";
+import { SearchIcon } from "../components/Icons";
 import { Navbar } from "../components/Navbar";
 import { useNewspaper } from "../hooks/useNewspaper";
 
@@ -70,21 +71,10 @@ export function SearchResultsPage() {
           </h1>
           <form onSubmit={handleSearch}>
             <div className="border-border bg-card flex h-12 w-full items-center gap-2.5 rounded-lg border px-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <SearchIcon
+                size={18}
                 className="text-muted-foreground shrink-0"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
+              />
               <input
                 type="text"
                 value={inputValue}

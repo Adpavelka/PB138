@@ -4,6 +4,8 @@ import { seedNewArticleCategory } from "./seeds/seedArticleCategories"
 import { seedAsignRoles } from "./seeds/seedUserRoles"
 import { seedArticles } from "./seeds/seedArticles";
 import { seedRandomAuthors } from "./seeds/seedRandomAuthors";
+import { seedEmma } from "./seeds/seedEmma";
+import { seedArticleReviews } from "./seeds/seedArticleReviews";
 
 
 async function seed() {
@@ -13,6 +15,8 @@ async function seed() {
     await seedAsignRoles();
     await seedRandomAuthors(10);
     await seedArticles();
+    await seedEmma();
+    await seedArticleReviews();
 
 }
 

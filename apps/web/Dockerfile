@@ -1,12 +1,16 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-# Install dependencies
 COPY package.json bun.lock ./
-RUN bun install
+COPY apps/server/package.json ./apps/server/package.json
+COPY apps/web/package.json ./apps/web/package.json
 
-# Copy source
-COPY . .
+RUN bun install --frozen-lockfile
+
+COPY apps/server/ ./apps/server/
+COPY apps/web/ ./apps/web/
+
+WORKDIR /app/apps/web
 
 EXPOSE 3000
 
